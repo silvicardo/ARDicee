@@ -14,6 +14,11 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
     
+    //creiamo un contenitore di tutti i dadi generati
+    
+    var diceArray = [SCNNode]()
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -120,6 +125,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     }
     
 
+    // MARK: - IBACTIONS
+    
+    @IBAction func rollAllDices(_ sender: UIBarButtonItem) {
+        
+        rollAll()
+    }
+    
+    
     // MARK: - ARSCNViewDelegate
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -167,41 +180,66 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                                                    y: hitResultPosition.y + diceNode.boundingSphere.radius,
                                                    z: hitResultPosition.z)
                     
+                    //aggiungiamo il dado all'array relativo
+                    diceArray.append(diceNode)
+                    
                     //aggiugniamo il dado alla scene
                     sceneView.scene.rootNode.addChildNode(diceNode)
                     
-                    //ANIMAZIONE DEL DADO
-                    
-                    //la rotazione nell'asse x e z devono potenzialmente
-                    //poter mostrare qualsiasi faccia del dado
-                    //ogni asse può determinare l'apparizione di una tra 4 facce
-                    //otteniamo un numero casuale tra 1 e 4 e
-                    //lo moltiplichiamo per una rotazione di valore 90°
-                    //così facendo faremo ruotare il dado che raggiungerà
-                    //un appoggio casuale e perfetto sul piano.
-                    
-                    let randomX = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
-                    
-                    let randomZ = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
-                    
-                    //applichiamo la rotazione con il metodo runAction al Dado
-                    
-                    diceNode.runAction(
-                        
-                        //moltiplicando i valori casuali di rotazione
-                        //imprimiamo un numero maggiore di rotazioni
-                        //entro la durata dell'animazione
-                        
-                        SCNAction.rotateBy(x: randomX * 5,
-                                           y: 0,
-                                           z: randomZ * 5,
-                                           duration: 0.5)
-                    )
+                    //richiamiamo il metodo di rotazione casuale
+                    roll(diceNode)
                 }
             }
             
         }
     }
+    
+    //metodo che genera e applica una rotazione casuale per ogni dado nella scene
+    func rollAll() {
+        if !diceArray.isEmpty {
+            for dice in diceArray {
+              roll(dice)
+            }
+        }
+    }
+    
+    //metodo che genera e applica una rotazione casuale al dado Input
+    func roll(_ dice:SCNNode) {
+        //ANIMAZIONE DEL DADO
+        
+        //la rotazione nell'asse x e z devono potenzialmente
+        //poter mostrare qualsiasi faccia del dado
+        //ogni asse può determinare l'apparizione di una tra 4 facce
+        //otteniamo un numero casuale tra 1 e 4 e
+        //lo moltiplichiamo per una rotazione di valore 90°
+        //così facendo faremo ruotare il dado che raggiungerà
+        //un appoggio casuale e perfetto sul piano.
+        
+        let randomX = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
+        
+        let randomZ = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
+        
+        //applichiamo la rotazione con il metodo runAction al Dado
+        
+        dice.runAction(
+            
+            //moltiplicando i valori casuali di rotazione
+            //imprimiamo un numero maggiore di rotazioni
+            //entro la durata dell'animazione
+            
+            SCNAction.rotateBy(x: randomX * 5,
+                               y: 0,
+                               z: randomZ * 5,
+                               duration: 0.5)
+        )
+    }
+    
+    //al termine dello shake del dispositivo
+    override func motionEnded(_ motion: UIEventSubtype, with event: UIEvent?) {
+        //ruota casualmente tutti i dadi
+        rollAll()
+    }
+    
     
     //Se viene rilevata una superficie orizzontale vi assegna  widht+height(ARAnchor)
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
