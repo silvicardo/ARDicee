@@ -132,8 +132,16 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         rollAll()
     }
     
+    @IBAction func removeAllDices(_ sender: UIBarButtonItem) {
+        //remove
+        if !diceArray.isEmpty {
+            for dice in diceArray {
+                dice.removeFromParentNode()
+            }
+        }
+    }
     
-    // MARK: - ARSCNViewDelegate
+    // MARK: - Metodi Rendering Oggetti Dado
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
        
@@ -159,38 +167,43 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 // e vi posizioniamo
                 //l'oggetto DADO da File .DAE
                 
-                //Se al percorso viene trovato una scene con node "diceCollada.scn"
-                let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
-                //aggiungi la scena al root Node con nome "Dice"(definito nell'inspector)
-                //l'attributo recursively-true include anche i childNodes rispetto a quello in oggetto
-                if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
-                    //la posizione del dado sarà il punto toccato sul piano selezionato
-                    
-                    //worldTransform è matrice 4x4 di float
-                    //4 colonne x 4 righe
-                    //definiscono scale, rotation e position
-                    //la quarta colonna(3) ci da la posizione
-                    let hitResultPosition = hitResult.worldTransform.columns.3
-                    //la posizione del dado sarà data dai piani
-                    //corrispondenti nella posizione appena definita
-                    //correggiamo la proprietà y aggiungendo il raggio dell'oggetto.
-                    //In pratica aggiungiamo la metà della sua altezza
-                    //così da farlo posizionare subito sopra al piano
-                    diceNode.position = SCNVector3(x: hitResultPosition.x,
-                                                   y: hitResultPosition.y + diceNode.boundingSphere.radius,
-                                                   z: hitResultPosition.z)
-                    
-                    //aggiungiamo il dado all'array relativo
-                    diceArray.append(diceNode)
-                    
-                    //aggiugniamo il dado alla scene
-                    sceneView.scene.rootNode.addChildNode(diceNode)
-                    
-                    //richiamiamo il metodo di rotazione casuale
-                    roll(diceNode)
+                addDice(atLocation: hitResult)
                 }
-            }
             
+        }
+    }
+    
+    //aggiunge un dado alla scene e lo fa ruotare casualmente alla sua apparizione
+    func addDice(atLocation hitResult: ARHitTestResult){
+        
+        //Se al percorso viene trovato una scene con node "diceCollada.scn"
+        let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
+        //aggiungi la scena al root Node con nome "Dice"(definito nell'inspector)
+        //l'attributo recursively-true include anche i childNodes rispetto a quello in oggetto
+        if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
+            //la posizione del dado sarà il punto toccato sul piano selezionato
+            
+            //worldTransform è matrice 4x4 di float
+            //4 colonne x 4 righe
+            //definiscono scale, rotation e position
+            //la quarta colonna(3) ci da la posizione
+            let hitResultPosition = hitResult.worldTransform.columns.3
+            //la posizione del dado sarà data dai piani
+            //corrispondenti nella posizione appena definita
+            //correggiamo la proprietà y aggiungendo il raggio dell'oggetto.
+            //In pratica aggiungiamo la metà della sua altezza
+            //così da farlo posizionare subito sopra al piano
+            diceNode.position = SCNVector3(x: hitResultPosition.x,
+                                           y: hitResultPosition.y + diceNode.boundingSphere.radius,
+                                           z: hitResultPosition.z)
+            //aggiungiamo il dado all'array relativo
+            diceArray.append(diceNode)
+            
+            //aggiugniamo il dado alla scene
+            sceneView.scene.rootNode.addChildNode(diceNode)
+            
+            //richiamiamo il metodo di rotazione casuale
+            roll(diceNode)
         }
     }
     
@@ -240,62 +253,65 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         rollAll()
     }
     
+    //MARK: - Metodi ARSCNViewDelegate
     
     //Se viene rilevata una superficie orizzontale vi assegna  widht+height(ARAnchor)
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
         
-        //controlliamo se l'ARAnchor corrisponde ad un piano orizzontale
-        if anchor is ARPlaneAnchor {
-            print("planeDetected")
+            //controlliamo se l'ARAnchor corrisponde ad un piano orizzontale
             //se lo è creiamo un ARPlaneAnchor dal valore di anchor
-            let planeAnchor = anchor as! ARPlaneAnchor
-            
-            //creiamo uno scenePlane dalla larghezza e profondità di planeAnchor
-            //Uno ScenePlane va ideato come superficie orizzontale le cui dimensioni
-            //vengono assegnate nella sua rappresentazione verticale
-            //l'asse x del plane è l'asse x dell'anchor(la regolare larghezza)
-            //l'asse y del plane è l'asse z (profondità) dell'anchor
-            //l'asse z non è prevista in un SCNPlane
-            
-            let scnPlane = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
-            
-            //creiamo un punto nello spazio da aggiungere alla scene
-            let planeNode = SCNNode()
-            
-            planeNode.position = SCNVector3(x: planeAnchor.center.x, y: 0, z: planeAnchor.center.z)
-            
-            //dobbiamo ruotare di 90° il plane per far si che si "appoggi"all'asse umano x
-            //angle definisce l'angolo di rotazione(Float.pi = 180° in senso antiorario)
-            //1 o 0 fa da vero/falso per l'attivazione della rotazione per quegli assi
-            //in questo caso va girato solo dall'asse x
-            
-            planeNode.transform = SCNMatrix4MakeRotation(-Float.pi/2, 1, 0, 0)
-            
-            //applichiamo al piano l'immagine png griglia
-            
-            let gridMaterial = SCNMaterial()
-            
-            gridMaterial.diffuse.contents = UIImage(named: "art.sncassets/grid.png")
-            
-            scnPlane.materials = [gridMaterial]
-            
-            //le misure del planeNode sono quelle dello scenePlane
-            
-            planeNode.geometry = scnPlane
-            
+            guard let planeAnchor = anchor as? ARPlaneAnchor else {return}
+        
+            print("planeDetected")
+        
+            //creiamo un nodo per il piano orizzontale che mostrerà una griglia
+            let planeNode : SCNNode = createPlane(with: planeAnchor)
+        
             //a partire dall'input della funzione(node) aggiungiamo il planeNode creato
             
             node.addChildNode(planeNode)
-            
-            
-        } else {
-            return
-        }
-        
-        
     }
     
+    //MARK: - Metodi Rendering del piano rilevato
     
+    func createPlane(with planeAnchor: ARPlaneAnchor) -> SCNNode {
+        
+        //creiamo uno scenePlane dalla larghezza e profondità di planeAnchor
+        //Uno ScenePlane va ideato come superficie orizzontale le cui dimensioni
+        //vengono assegnate nella sua rappresentazione verticale
+        //l'asse x del plane è l'asse x dell'anchor(la regolare larghezza)
+        //l'asse y del plane è l'asse z (profondità) dell'anchor
+        //l'asse z non è prevista in un SCNPlane
+        
+        let scnPlane = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
+        
+        //creiamo un punto nello spazio da aggiungere alla scene
+        let planeNode = SCNNode()
+        
+        planeNode.position = SCNVector3(x: planeAnchor.center.x, y: 0, z: planeAnchor.center.z)
+        
+        //dobbiamo ruotare di 90° il plane per far si che si "appoggi"all'asse umano x
+        //angle definisce l'angolo di rotazione(Float.pi = 180° in senso antiorario)
+        //1 o 0 fa da vero/falso per l'attivazione della rotazione per quegli assi
+        //in questo caso va girato solo dall'asse x
+        
+        planeNode.transform = SCNMatrix4MakeRotation(-Float.pi/2, 1, 0, 0)
+        
+        //applichiamo al piano l'immagine png griglia
+        
+        let gridMaterial = SCNMaterial()
+        
+        gridMaterial.diffuse.contents = UIImage(named: "art.sncassets/grid.png")
+        
+        scnPlane.materials = [gridMaterial]
+        
+        //le misure del planeNode sono quelle dello scenePlane
+        
+        planeNode.geometry = scnPlane
+        
+        return planeNode
+        
+    }
     
     
 }
