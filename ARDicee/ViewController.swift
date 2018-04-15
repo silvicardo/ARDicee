@@ -23,8 +23,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         //mostra i punti tramite i quali avviene il riconoscimento di supercici orizzontali
         self.sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints]
         
-        
-        
         /***OGGETTO CUBO***/
         
         //creiamo un nostro oggetto da visualizzare
@@ -172,6 +170,33 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     //aggiugniamo il dado alla scene
                     sceneView.scene.rootNode.addChildNode(diceNode)
                     
+                    //ANIMAZIONE DEL DADO
+                    
+                    //la rotazione nell'asse x e z devono potenzialmente
+                    //poter mostrare qualsiasi faccia del dado
+                    //ogni asse può determinare l'apparizione di una tra 4 facce
+                    //otteniamo un numero casuale tra 1 e 4 e
+                    //lo moltiplichiamo per una rotazione di valore 90°
+                    //così facendo faremo ruotare il dado che raggiungerà
+                    //un appoggio casuale e perfetto sul piano.
+                    
+                    let randomX = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
+                    
+                    let randomZ = CGFloat(Float(arc4random_uniform(4) + 1) * (Float.pi/2))
+                    
+                    //applichiamo la rotazione con il metodo runAction al Dado
+                    
+                    diceNode.runAction(
+                        
+                        //moltiplicando i valori casuali di rotazione
+                        //imprimiamo un numero maggiore di rotazioni
+                        //entro la durata dell'animazione
+                        
+                        SCNAction.rotateBy(x: randomX * 5,
+                                           y: 0,
+                                           z: randomZ * 5,
+                                           duration: 0.5)
+                    )
                 }
             }
             
