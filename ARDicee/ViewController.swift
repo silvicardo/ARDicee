@@ -20,6 +20,9 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         //Assegnazione delegato
         sceneView.delegate = self
         
+        //mostra i punti tramite i quali avviene il riconoscimento di supercici orizzontali
+        self.sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints]
+        
         
         
         /***OGGETTO CUBO***/
@@ -85,34 +88,10 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         sceneView.scene.rootNode.addChildNode(sphereNode)
         
-        /***OGGETTO DADO DA .DAE FILE***/
-        
-        //Se al percorso viene trovato una scene con node "diceCollada.scn"
-        let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
-            //aggiungi la scena al root Node con nome "Dice"(definito nell'inspector)
-            //l'attributo recursively-true include anche i childNodes rispetto a quello in oggetto
-        if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
-            //definiamo una posizione
-            
-            diceNode.position = SCNVector3(x: 0, y: 0, z: -0.1)
-            
-            sceneView.scene.rootNode.addChildNode(diceNode)
-            
-        }
-        
-       
-        
-        
-        
         //aggiungiamo effetti di luce(ombre per gli oggetti)
         
         sceneView.autoenablesDefaultLighting = true
         
-//        // Create a new scene
-//        let scene = SCNScene(named: "art.scnassets/ship.scn")!
-//
-//        // Set the scene to the view
-//        sceneView.scene = scene
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -120,10 +99,13 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         // Create a session configuration
         let configuration = ARWorldTrackingConfiguration()
-
+        
+        //Aggiungiamo rilevamento piani orizzontali
+        
+        configuration.planeDetection = .horizontal
+        
         // Run the view's session
         sceneView.session.run(configuration)
-        
         
         //Stampiamo in console lo stato di compatibilità della sessione AR
         
@@ -139,20 +121,118 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         sceneView.session.pause()
     }
     
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Release any cached data, images, etc that aren't in use.
-    }
 
     // MARK: - ARSCNViewDelegate
     
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+       
+        //touches è un set di oggetti di UITouch
+        //ne estraiamo solo il primo tocco(evitiamo multitouch)
+        if let touch = touches.first {
+            //La posizione del tocco nella sceneView
+            let touchLocation = touch.location(in: sceneView)
+            //il display è in 2d quindi per convertire il tocco nello spazio 3d
+            //il metodo hitTest aggiunge la profondità al tocco
+            
+            let results : [ARHitTestResult] = sceneView.hitTest(touchLocation, types: .existingPlaneUsingExtent)
+            
+            //Comunichiamo in console la posizione del tocco rispetto al piano rilevato
+            if !results.isEmpty {
+                print("Oggetto toccato nel piano orizzontale")
+            } else {
+                print("Oggetto toccato al di fuori del piano")
+            }
+            
+            // se l'array result non è vuoto ne estraiamo il primo valore
+            if let hitResult = results.first {
+                // e vi posizioniamo
+                //l'oggetto DADO da File .DAE
+                
+                //Se al percorso viene trovato una scene con node "diceCollada.scn"
+                let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
+                //aggiungi la scena al root Node con nome "Dice"(definito nell'inspector)
+                //l'attributo recursively-true include anche i childNodes rispetto a quello in oggetto
+                if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
+                    //la posizione del dado sarà il punto toccato sul piano selezionato
+                    
+                    //worldTransform è matrice 4x4 di float
+                    //4 colonne x 4 righe
+                    //definiscono scale, rotation e position
+                    //la quarta colonna(3) ci da la posizione
+                    let hitResultPosition = hitResult.worldTransform.columns.3
+                    //la posizione del dado sarà data dai piani
+                    //corrispondenti nella posizione appena definita
+                    //correggiamo la proprietà y aggiungendo il raggio dell'oggetto.
+                    //In pratica aggiungiamo la metà della sua altezza
+                    //così da farlo posizionare subito sopra al piano
+                    diceNode.position = SCNVector3(x: hitResultPosition.x,
+                                                   y: hitResultPosition.y + diceNode.boundingSphere.radius,
+                                                   z: hitResultPosition.z)
+                    
+                    //aggiugniamo il dado alla scene
+                    sceneView.scene.rootNode.addChildNode(diceNode)
+                    
+                }
+            }
+            
+        }
     }
-*/
+    
+    //Se viene rilevata una superficie orizzontale vi assegna  widht+height(ARAnchor)
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        
+        //controlliamo se l'ARAnchor corrisponde ad un piano orizzontale
+        if anchor is ARPlaneAnchor {
+            print("planeDetected")
+            //se lo è creiamo un ARPlaneAnchor dal valore di anchor
+            let planeAnchor = anchor as! ARPlaneAnchor
+            
+            //creiamo uno scenePlane dalla larghezza e profondità di planeAnchor
+            //Uno ScenePlane va ideato come superficie orizzontale le cui dimensioni
+            //vengono assegnate nella sua rappresentazione verticale
+            //l'asse x del plane è l'asse x dell'anchor(la regolare larghezza)
+            //l'asse y del plane è l'asse z (profondità) dell'anchor
+            //l'asse z non è prevista in un SCNPlane
+            
+            let scnPlane = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
+            
+            //creiamo un punto nello spazio da aggiungere alla scene
+            let planeNode = SCNNode()
+            
+            planeNode.position = SCNVector3(x: planeAnchor.center.x, y: 0, z: planeAnchor.center.z)
+            
+            //dobbiamo ruotare di 90° il plane per far si che si "appoggi"all'asse umano x
+            //angle definisce l'angolo di rotazione(Float.pi = 180° in senso antiorario)
+            //1 o 0 fa da vero/falso per l'attivazione della rotazione per quegli assi
+            //in questo caso va girato solo dall'asse x
+            
+            planeNode.transform = SCNMatrix4MakeRotation(-Float.pi/2, 1, 0, 0)
+            
+            //applichiamo al piano l'immagine png griglia
+            
+            let gridMaterial = SCNMaterial()
+            
+            gridMaterial.diffuse.contents = UIImage(named: "art.sncassets/grid.png")
+            
+            scnPlane.materials = [gridMaterial]
+            
+            //le misure del planeNode sono quelle dello scenePlane
+            
+            planeNode.geometry = scnPlane
+            
+            //a partire dall'input della funzione(node) aggiungiamo il planeNode creato
+            
+            node.addChildNode(planeNode)
+            
+            
+        } else {
+            return
+        }
+        
+        
+    }
+    
+    
+    
     
 }
